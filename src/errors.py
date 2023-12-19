@@ -21,8 +21,8 @@ class Error(Exception):
 
 
 class ApiError(Error):
-    """Process and expose error details sent by  API.
-    """
+    """Process and expose error details sent by  API."""
+
     def __init__(self, error: str, response: Response) -> None:
         self.status_code: int = response.status_code
         self.reason_phrase: str = response.reason_phrase or ""
