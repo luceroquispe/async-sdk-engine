@@ -32,6 +32,7 @@ from loguru import logger
 
 from src.errors import ApiError, CommunicationError
 
+
 class RequestInfo(namedtuple("RequestInfo", ["method", "path", "params", "body"])):
     """
     A named tuple to represent request information.
@@ -53,7 +54,7 @@ class RequestInfo(namedtuple("RequestInfo", ["method", "path", "params", "body"]
         cls,
         method: str,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
+        params: Optional[Union[Dict[str, Any], str]] = None,
         body: Optional[Any] = None,
     ):
         """RequestInfo dto for all methods"""
@@ -152,7 +153,7 @@ class AsyncHandler:
             timeout=self.timeout,
             limits=self.limits,
         ) as client:
-            limit = trio.CapacityLimiter(4)  # Set limit to 4 concurrant requests.
+            limit = trio.CapacityLimiter(50)  # limit whatever your server needs.
             async with trio.open_nursery() as nursery:
                 for request in requests:
                     method = self.get_method_by_name(client, request.method)
