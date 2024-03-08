@@ -16,21 +16,14 @@ This behaviour is optional with client instance arg "raise_on_error" default to 
 """
 
 from collections import namedtuple
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Union, overload
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 import trio
 from httpx import (
     AsyncClient,
-    ConnectError,
-    ConnectTimeout,
-    HTTPStatusError,
     Limits,
-    RemoteProtocolError,
     Response,
 )
-from loguru import logger
-
-from src.errors import ApiError, CommunicationError
 
 
 class RequestInfo(namedtuple("RequestInfo", ["method", "path", "params", "body"])):
@@ -62,6 +55,12 @@ class RequestInfo(namedtuple("RequestInfo", ["method", "path", "params", "body"]
         if method.upper() in {"GET", "DELETE"}:
             body = None
         return super().__new__(cls, method, path, params, body)
+
+    def __repr__(self):
+        return (
+            f"RequestInfo(method: {self.method}, path: {self.path}, "
+            f"params: {self.params}, body: {self.body})"
+        )
 
 
 class AsyncHandler:
@@ -120,22 +119,15 @@ class AsyncHandler:
         """
         async with limit:
             method_name = https_method.__name__
-            try:
-                # Get and Delete requests have no body
-                if method_name in ("get", "delete"):
-                    response = await https_method(path, params=params)
-                # all other methods have optional or mandatory body
-                else:
-                    response = await https_method(path, params=params, json=body)
-            # Non status errors e.g. transport related raise
-            except (ConnectError, ConnectTimeout, RemoteProtocolError) as err:
-                raise CommunicationError(str(err)) from err
+            # Get and Delete requests have no body
+            if method_name in ("get", "delete"):
+                response = await https_method(path, params=params)
+            # all other methods have optional or mandatory body
+            else:
+                response = await https_method(path, params=params, json=body)
             # fail on error if not 200 or similar OK response
             if self.raise_on_error:
-                try:
-                    response.raise_for_status()
-                except HTTPStatusError as err:
-                    raise ApiError(str(err), response) from err
+                response.raise_for_status()
             self.responses.append(response)
 
     async def send_requests(self, requests: List[RequestInfo]):
@@ -192,7 +184,7 @@ class Requests:
 
     def __init__(
         self,
-        base_url: str = "https://httpbin.org/",
+        base_url: str,
         headers: Optional[Dict[str, str]] = None,
         verify: bool = False,
         timeout: int = 15,
@@ -204,18 +196,7 @@ class Requests:
         self.timeout = timeout
         self.raise_on_error = raise_on_error
 
-    @overload
-    def client_requests(self, requests: RequestInfo) -> Response:
-        ...
-
-    @overload
     def client_requests(self, requests: List[RequestInfo]) -> List[Response]:
-        ...
-
-    def client_requests(
-        self,
-        requests: Union[RequestInfo, List[RequestInfo]],
-    ) -> Union[Response, List[Response]]:
         """
         This function sends one or more HTTP requests asynchronously using trio framework.
 
@@ -233,15 +214,8 @@ class Requests:
             timeout=self.timeout,
             raise_on_error=self.raise_on_error,
         )
-
-        # Ensure requests is a list even if only one request is given
-        if isinstance(requests, RequestInfo):
-            requests = [requests]
+        # all requests must be in a list
         # run all requests async and append responses
-        logger.debug(requests)
         trio.run(request_maker.send_requests, requests)
-        return (
-            request_maker.responses[0]
-            if len(request_maker.responses) == 1
-            else request_maker.responses
-        )
+        # responses lists from all requests
+        return request_maker.responses

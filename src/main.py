@@ -1,15 +1,19 @@
+import json
+
 from loguru import logger
-from src.http_requests import Requests, RequestInfo
 
-# list the requests
-requests = [
-    RequestInfo("GET", "get"),
-    RequestInfo(method="POST", path="post", body={"test": "example"}),
-    RequestInfo(method="GET", path="get", params="test"),
-]
+from src.client import ApiClient
 
-if __name__ == "__main__":
-    req = Requests()
-    responses = req.client_requests(requests)
-    for response in responses:
-        logger.info(response.json())
+client = ApiClient("https://httpbin.org/")
+
+responses = client.get_anything(
+    [
+        {"gday": {"mate": {"how": {"the": {"bloody": {"hell": ["are", "ya", 0]}}}}}},
+        {"gday": {"mate": {"how": {"the": {"bloody": {"hell": ["are", "ya", 1]}}}}}},
+        {"gday": {"mate": {"how": {"the": {"bloody": {"hell": ["are", "ya", 2]}}}}}},
+    ]
+)
+
+for response in responses:
+    tidy_json_str_response = json.dumps(response.json(), indent=2)
+    logger.debug(tidy_json_str_response)
