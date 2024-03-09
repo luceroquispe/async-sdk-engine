@@ -21,7 +21,6 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 import trio
 from httpx import (
     AsyncClient,
-    Limits,
     Response,
 )
 
@@ -88,7 +87,6 @@ class AsyncHandler:
         self.timeout = timeout
         self.verify = verify
         self.raise_on_error = raise_on_error
-        self.limits = Limits(max_connections=50)
         self.responses: List[Response] = []
 
     async def __aenter__(self):
@@ -100,7 +98,6 @@ class AsyncHandler:
 
     async def make_request(
         self,
-        limit: trio.CapacityLimiter,
         https_method: Callable[..., Awaitable[Response]],
         path: str,
         params: Optional[Dict[str, Any]] = None,
@@ -117,18 +114,17 @@ class AsyncHandler:
             body (Optional[Union[dict, str, bytes]], optional): Request body data.
                 Defaults to None.
         """
-        async with limit:
-            method_name = https_method.__name__
-            # Get and Delete requests have no body
-            if method_name in ("get", "delete"):
-                response = await https_method(path, params=params)
-            # all other methods have optional or mandatory body
-            else:
-                response = await https_method(path, params=params, json=body)
-            # fail on error if not 200 or similar OK response
-            if self.raise_on_error:
-                response.raise_for_status()
-            self.responses.append(response)
+        method_name = https_method.__name__
+        # Get and Delete requests have no body
+        if method_name in ("get", "delete"):
+            response = await https_method(path, params=params)
+        # all other methods have optional or mandatory body
+        else:
+            response = await https_method(path, params=params, json=body)
+        # fail on error if not 200 or similar OK response
+        if self.raise_on_error:
+            response.raise_for_status()
+        self.responses.append(response)
 
     async def send_requests(self, requests: List[RequestInfo]):
         """
@@ -143,15 +139,12 @@ class AsyncHandler:
             headers=self.headers,
             verify=self.verify,
             timeout=self.timeout,
-            limits=self.limits,
         ) as client:
-            limit = trio.CapacityLimiter(50)  # limit whatever your server needs.
             async with trio.open_nursery() as nursery:
                 for request in requests:
                     method = self.get_method_by_name(client, request.method)
                     nursery.start_soon(
                         self.make_request,
-                        limit,
                         method,
                         request.path,
                         request.params,
@@ -176,7 +169,7 @@ class AsyncHandler:
             "PATCH": client.patch,
             "DELETE": client.delete,
         }
-        return method_map.get(method_name.upper(), client.get)
+        return method_map[method_name.upper()]
 
 
 class Requests:

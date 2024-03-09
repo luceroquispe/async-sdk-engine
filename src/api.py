@@ -13,7 +13,7 @@ class Anything:
         self.requests = requests.client_requests
 
     def get_anything(self, gday_body_list: List[Dict[str, Any]]) -> List[Response]:
-        """GET request of /anything
+        """GET request of /anything endpoint
 
         https://httpbin.org/anything
 
@@ -26,6 +26,7 @@ class Anything:
             ValueError: If the input asset_id is not of type int or list.
 
         Example Usage:
+
         ```python
         >>> responses = client.get_anything(
             [
@@ -37,10 +38,10 @@ class Anything:
         ```
         """
         # Validate and do nothing if ok
-        GdayBodyList.parse_obj(gday_body_list)
+        GdayBodyList.model_validate(gday_body_list)
         # request
         request_info = [
-            RequestInfo(method="GET", path="anything", body=body)
+            RequestInfo(method="GET", path="anything", params=None, body=body)
             for body in gday_body_list
         ]
         return self.requests(requests=request_info)

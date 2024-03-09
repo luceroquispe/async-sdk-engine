@@ -1,6 +1,8 @@
 """ 
 example client with Anything endpoint method
 """
+from typing import Dict
+
 from src.http_requests import Requests
 from src.api import Anything
 
@@ -16,6 +18,7 @@ class ApiClient(Anything):
     def __init__(
         self,
         base_url: str,
+        headers: Dict[str, str] | None = None,
         verify: bool = False,
         timeout: int = 15,
         raise_on_error: bool = True,
@@ -31,6 +34,7 @@ class ApiClient(Anything):
         """
         self.http_client = Requests(
             base_url=base_url,
+            headers=headers,
             verify=verify,
             timeout=timeout,
             raise_on_error=raise_on_error,
